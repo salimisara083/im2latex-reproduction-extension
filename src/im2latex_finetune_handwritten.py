@@ -110,7 +110,7 @@ lora_config = LoraConfig(
 )
 
 # applying lora
-model = get_peft_model(model, lora_config)
+model = get_peft_model(base_model, lora_config)
 if master_process:  
     model.print_trainable_parameters() 
 
