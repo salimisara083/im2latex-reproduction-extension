@@ -12,7 +12,7 @@ from transformers import (
     get_linear_schedule_with_warmup
 )
 
-from peft import LoraConfig, IA3Config, get_peft_model
+from peft import LoraConfig, IA3Config, get_peft_model, peftModel
 
 from PIL import Image
 import evaluate
@@ -227,7 +227,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sam
 
 # training parameters
 learning_rate = 2e-4
-num_epochs = 40  # using epochs for printing purposes actually, but control by max_steps
+num_epochs = 1  # using epochs for printing purposes actually, but control by max_steps
 warmup_steps = Config.warmup_steps
 eval_steps = 40
 
@@ -442,7 +442,7 @@ dist.broadcast(best_step_tensor, src=0)
 
 best_checkpoint_step = best_step_tensor.item()
 checkpoint_dir = f"checkpoints/checkpoint_step_{best_checkpoint_step}"
-best_model = get_peft_model(base_model, checkpoint_dir)
+best_model = peftModel.from_pretrained(base_model, checkpoint_dir)
 best_tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
 
 # evaluating on test set
