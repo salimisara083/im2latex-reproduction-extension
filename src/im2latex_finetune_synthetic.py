@@ -12,7 +12,7 @@ from transformers import (
     get_linear_schedule_with_warmup
 )
 
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, PeftModel
 
 from PIL import Image
 import evaluate
@@ -87,6 +87,9 @@ if master_process:
 
 # setting up the model
 base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex").to(device)
+model = PeftModel.from_pretrained(base_model,
+                                "myhfpathto get the lora checkpoint",
+                                is_trainable=True)
 #to do : uploading the finetuned model on github and getting it from there
 # applying lora
 model = get_peft_model(base_model, Config.checkpoint_path)
@@ -418,7 +421,7 @@ best_step_tensor = torch.tensor(
 dist.broadcast(best_step_tensor, src=0)
 # evaluating on the final test dataset
 checkpoint_dir = f"checkpoints/checkpoint_step_{best_checkpoint_step}"
-best_model = get_peft_model(base_model, checkpoint_dir).to(device)
+best_model = PeftModel.from_pretrained(base_model, checkpoint_dir)
 
 best_tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
 
