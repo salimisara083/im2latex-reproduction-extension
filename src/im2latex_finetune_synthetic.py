@@ -407,6 +407,15 @@ eval_dataset = LatexDataset(combined_eval_ds, tokenizer, feature_extractor, phas
 
 eval_dataloader = DataLoader(eval_dataset, batch_size=Config.batch_size_val, collate_fn=data_collator)
 
+# Rank 0 has the correct best checkpoint step
+best_step_tensor = torch.tensor(
+    [best_checkpoint_step if master_process else -1],
+    device=device,
+    dtype=torch.long
+)
+
+# Send rank 0's value to every process
+dist.broadcast(best_step_tensor, src=0)
 # evaluating on the final test dataset
 checkpoint_dir = f"checkpoints/checkpoint_step_{best_checkpoint_step}"
 best_model = get_peft_model(base_model, checkpoint_dir).to(device)
