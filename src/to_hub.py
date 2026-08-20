@@ -4,15 +4,12 @@ from transformers import (
     AutoTokenizer
 )
 
-login(token='*')
-
-# initializing API and repository
 api = HfApi()
-model_name = "DGurgurov/im2latex"
-api.create_repo(repo_id=model_name, exist_ok=True)
+api.create_repo(repo_id="salimisara083/im2latex-handwritten-arabic-persian",
+                repo_type="model",
+                exist_ok=True)
 
-# cloning the repository
-checkpoint_dir = f"checkpoints/checkpoint_epoch_6_step_19400"
+checkpoint_dir = f"D://projects/im2latex/checkpoints"
 
 # saving model and tokenizer
 api.upload_folder(

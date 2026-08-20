@@ -349,7 +349,6 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
                         global best_checkpoint_step
                         best_checkpoint_step = global_step
 
-                        # TODO: doesn't work properly - only deletes a few iterations ago, not the previous one
                         if best_checkpoint_step is not None: #it's not the first global step
                             for filename in os.listdir(checkpoint_dir):
                                 if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}":
@@ -364,7 +363,7 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
                                                 shutil.rmtree(previous_checkpoint_path) #remove the dir and everything inside it
                                     except ValueError:
                                         continue
-        torch.cuda.synchronize()
+        torch.cuda.synchronize() #cpu waiting until all of the cuda operations on the current GPU has been finished
         epoch_end_time = time.time()
         epoch_duration = epoch_end_time - epoch_start_time
         if master_process:
@@ -429,7 +428,6 @@ train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device,
 dist.barrier()
 
 
-# evaluating on the final test dataset
 # Rank 0 has the correct best checkpoint step
 best_step_tensor = torch.tensor(
     [best_checkpoint_step if master_process else -1],

@@ -16,7 +16,7 @@ class Config:
     max_length=512
     
     # training parameters
-    num_epochs = 1
+    num_epochs = 40
     batch_size_train = 8
     batch_size_val = 8
     learning_rate = 1e-4
