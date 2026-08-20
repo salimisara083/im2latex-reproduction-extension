@@ -88,7 +88,7 @@ if master_process:
 # setting up the model
 base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex").to(device)
 model = PeftModel.from_pretrained(base_model,
-                                "myhfpathto get the lora checkpoint",
+                                "./stage1",
                                 is_trainable=True)
 #to do : uploading the finetuned model on github and getting it from there
 # applying lora
@@ -324,7 +324,6 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
                         # updating the best checkpoint step for folder name
                         best_checkpoint_step = global_step
 
-                        # TODO: doesn't work properly - only deletes a few iterations ago, not the previous one
                         if best_checkpoint_step is not None:
                             for filename in os.listdir(checkpoint_dir):
                                 if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}":
