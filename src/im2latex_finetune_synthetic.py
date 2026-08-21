@@ -88,7 +88,7 @@ if master_process:
 # setting up the model
 base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex").to(device)
 model = PeftModel.from_pretrained(base_model,
-                                "./stage1",
+                                "stage1",
                                 is_trainable=True)
 #to do : uploading the finetuned model on github and getting it from there
 # applying lora
