@@ -12,9 +12,11 @@ from transformers import (
     get_linear_schedule_with_warmup
 )
 
-from peft import LoraConfig, IA3Config, get_peft_model
+from peft import LoraConfig, IA3Config, get_peft_model, PeftModel
 
 from PIL import Image
+import pandas as pd
+from sklearn.model_selection import train_test_split
 import evaluate
 from datasets import load_dataset
 import numpy as np
@@ -23,7 +25,7 @@ import os
 import json
 import time
 
-from train_config import Config
+from finetune_config import Config
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -59,36 +61,62 @@ tokenizer = AutoTokenizer.from_pretrained(Config.tokenizer_name)
 tokenizer.pad_token = tokenizer.eos_token
 feature_extractor = AutoFeatureExtractor.from_pretrained(Config.feature_extractor)
 
+#using kagglenotebook for training and using the dataset directly from kaggle input
 # loading new dataset
-new_dataset = load_dataset("linxy/LaTeX_OCR", "human_handwrite")
+df = pd.read_csv("/kaggle/input/datasets/shgyg99/arabicmath2latex-hme-dataset/labeled_formulas.csv")
 
-# combining train, val, and test splits and then splitting into train and val
-train_ds = new_dataset['train']
-val_ds = new_dataset['validation']
-test_ds = new_dataset['test']
+#modifying the image paths
+for i in range(len(df['Image Path'])) :
+    df['Image Path'][i] = df['Image Path'][i].replace('\\', '/')
+    df['Image Path'][i] = "/kaggle/input/datasets/shgyg99/arabicmath2latex-hme-dataset" + df['Image Path'][i][1:]  
+    
+train_imgs, test_imgs, train_labels, test_labels = train_test_split(df['Image Path'], df['LaTeX Label'], seed=Config.seed, shuffle=True, train_size=0.8)
+train_df = pd.DataFrame({
+                        'Image Path':train_imgs,
+                        'LaTeX Label':train_labels
+})
+test_df = pd.DataFrame({
+                        'Image Path':test_imgs,
+                        'LaTeX Label':test_labels
+})
 
-def filter_dataset(dataset):
-    def is_valid_sample(sample):
-        try:
-            image = sample['image']
-            latex = sample['text']
-            return image is not None and latex is not None and len(latex) > 0
-        except:
-            return False
+def filter_df(df):
+    for row in df:
+        latex = row['LaTeX Label']
+        path = row['Image Path']
+        from pathlib import Path
+        path = Path(path)
+        if not path.is_file() :
+            df.drop(row, inplace=True)
+            continue
+        if latex is None:
+            df.drop(row, inplace=True)
+            continue
+        elif len(latex) == 0:
+            df.drop(row, inplace=True)
+            continue
 
-    return dataset.filter(is_valid_sample)
+        try :
+            with Image.open(path) as image :
+                image.load()
 
-train_ds = filter_dataset(train_ds)
-val_ds = filter_dataset(val_ds)
+        except Exception:
+            df.drop(row, inplace=True)
+
+    return df
+
+train_df = filter_df(train_df)
+test_df = filter_df(test_df)
 
 if master_process:
-    print("Length of train set after splitting:", len(train_ds))
-    print("Length of val set after splitting:", len(val_ds))
+    print("Length of train set after splitting:", len(train_df))
+    print("Length of val set after splitting:", len(test_df))
 
 # setting up the model
-model = VisionEncoderDecoderModel.from_pretrained("salimisara083/").to(device)
-# applying lora
-model = get_peft_model(model, lora_config)
+base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex").to(device)
+model = PeftModel.from_pretrained(base_model,
+                                "/kaggle/working/im2latex-reproduction-extension/src/stage1",
+                                is_trainable=True)
 if master_process:  
     model.print_trainable_parameters() 
 
@@ -106,7 +134,7 @@ class LatexDataset(Dataset):
         image_size=Config.image_size,
         max_length=512
     ):
-        self.dataset = dataset
+        self.df = df
         self.tokenizer = tokenizer
         self.feature_extractor = feature_extractor
         self.phase = phase
@@ -115,10 +143,11 @@ class LatexDataset(Dataset):
         self.train_transform = self.get_train_transform()
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.df)
 
     def get_train_transform(self):
-        def train_transform(image):
+        def train_transform(path):
+            image = Image.open(path)
             image = image.resize(self.image_size)
             image = np.array(image)
             image = image.astype(np.float32) / 255.0
@@ -126,9 +155,10 @@ class LatexDataset(Dataset):
         return train_transform
 
     def __getitem__(self, idx):
-        item = self.dataset[idx]
-        latex_sequence = item['text']
-        image = item['image']
+        item = self.df.oloc[idx]
+        latex_sequence = item['LaTeX Label']
+        image = item['Image Path']
+        image = Image.open(image)
 
         # converting RGBA to RGB for the test set --> some images have alphas
         if image.mode == 'RGBA':
@@ -191,21 +221,18 @@ def data_collator(batch):
     }
 
 # creating datasets and dataloader
-train_dataset = LatexDataset(train_ds, tokenizer, feature_extractor, phase='train')
-val_dataset = LatexDataset(val_ds, tokenizer, feature_extractor, phase='val')
-test_dataset = LatexDataset(test_ds, tokenizer, feature_extractor, phase='val')
+train_dataset = LatexDataset(train_df, tokenizer, feature_extractor, phase='train')
+test_dataset = LatexDataset(test_df, tokenizer, feature_extractor, phase='test')
 
 train_sampler = DistributedSampler(train_dataset)
-val_sampler = DistributedSampler(val_dataset, shuffle=False)
 test_sampler = DistributedSampler(test_dataset, shuffle=False)
 
 train_dataloader = DataLoader(train_dataset, batch_size=Config.batch_size_train, sampler=train_sampler, collate_fn=data_collator, drop_last=True )
-val_dataloader = DataLoader(val_dataset, batch_size=Config.batch_size_val, sampler=val_sampler, collate_fn=data_collator, drop_last=True )
-test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sampler=val_sampler, collate_fn=data_collator, drop_last=True )
+test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sampler=test_sampler, collate_fn=data_collator, drop_last=True )
 
 # training parameters
 learning_rate = 2e-4
-num_epochs = 40  # using epochs for printing purposes actually, but control by max_steps
+num_epochs = 1  # using epochs for printing purposes actually, but control by max_steps
 warmup_steps = Config.warmup_steps
 eval_steps = 40
 
@@ -324,23 +351,23 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
                         global best_checkpoint_step
                         best_checkpoint_step = global_step
 
-                        # TODO: doesn't work properly - only deletes a few iterations ago, not the previous one
-                        """if best_checkpoint_step is not None:
+                        if best_checkpoint_step is not None: #it's not the first global step
                             for filename in os.listdir(checkpoint_dir):
-                                if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}.pt":
+                                if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}":
                                     try:
                                         step_number = int(
                                                         filename.removeprefix("checkpoint_step_").removesuffix(".pt")
                                                         )
-                                        if step_number < (best_checkpoint_step - 200):
+                                        if step_number < (best_checkpoint_step):
                                             previous_checkpoint_path = os.path.join(checkpoint_dir, filename)
                                             if os.path.isdir(previous_checkpoint_path):
                                                 import shutil
                                                 shutil.rmtree(previous_checkpoint_path) #remove the dir and everything inside it
                                     except ValueError:
-                                        continue"""
-        torch.cuda.synchronize()
+                                        continue
+        torch.cuda.synchronize() #cpu waiting until all of the cuda operations on the current GPU has been finished
         epoch_end_time = time.time()
+        epoch_duration = epoch_end_time - epoch_start_time
         epoch_duration = epoch_end_time - epoch_start_time
         if master_process:
             print(f"Epoch {epoch+1} completed in {epoch_duration:.2f} seconds")
@@ -401,13 +428,21 @@ def evaluate(model, val_dataloader, device, tokenizer, bleu_metric, max_batches=
 
 # starting LoRA fine-tuning
 train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, eval_steps, val_dataloader, tokenizer, bleu_metric, local_rank=ddp_local_rank)
+dist.barrier()
 
+# Rank 0 has the correct best checkpoint step
+best_step_tensor = torch.tensor(
+    [best_checkpoint_step if master_process else -1],
+    device=device,
+    dtype=torch.long
+)
 
-# evaluating on the final test dataset
-best_checkpoint_step = best_checkpoint_step
+# Send rank 0's value to every process
+dist.broadcast(best_step_tensor, src=0)
+
+best_checkpoint_step = best_step_tensor.item()
 checkpoint_dir = f"checkpoints/checkpoint_step_{best_checkpoint_step}"
-best_model = VisionEncoderDecoderModel.from_pretrained(checkpoint_dir).to(device)
-
+best_model = PeftModel.from_pretrained(base_model, checkpoint_dir)
 best_tokenizer = AutoTokenizer.from_pretrained(checkpoint_dir)
 
 # evaluating on test set
