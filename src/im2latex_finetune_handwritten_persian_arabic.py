@@ -127,7 +127,7 @@ model = DDP(model, device_ids=[ddp_local_rank], output_device=ddp_local_rank, fi
 class LatexDataset(Dataset):
     def __init__(
         self,
-        dataset,
+        df,
         tokenizer,
         feature_extractor,
         phase,
