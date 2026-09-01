@@ -71,7 +71,7 @@ for i in range(len(df['Image Path'])) :
     df['Image Path'][i] = "/kaggle/input/datasets/shgyg99/arabicmath2latex-hme-dataset" + df['Image Path'][i][1:]  
     
 train_imgs, test_imgs, train_labels, test_labels = train_test_split(df['Image Path'], df['LaTeX Label'], random_state=Config.seed, shuffle=True, train_size=0.8)
-dev_imgs, test_imgs, dev_labels, test_labels = train_test_split(df['Image Path'], df['LaTeX Label'], random_state=Config.seed, shuffle=True, train_size=0.5)
+dev_imgs, test_imgs, dev_labels, test_labels = train_test_split(test_imgs, test_labels, random_state=Config.seed, shuffle=True, train_size=0.5)
 
 train_df = pd.DataFrame({
                         'Image Path':train_imgs,
