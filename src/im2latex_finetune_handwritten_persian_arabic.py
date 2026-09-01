@@ -155,7 +155,7 @@ class LatexDataset(Dataset):
         return train_transform
 
     def __getitem__(self, idx):
-        item = self.df.oloc[idx]
+        item = self.df.iloc[idx]
         latex_sequence = item['LaTeX Label']
         image = item['Image Path']
         image = Image.open(image)
