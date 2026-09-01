@@ -235,7 +235,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sam
 learning_rate = 2e-4
 num_epochs = 1  # using epochs for printing purposes actually, but control by max_steps
 warmup_steps = Config.warmup_steps
-eval_steps = 40
+eval_steps = 280
 
 # effective batch size per GPU (or per process)
 effective_batch_size = Config.batch_size_train * ddp_world_size
@@ -387,7 +387,7 @@ def evaluate(model, test_dataloader, device, tokenizer, bleu_metric, max_batches
         max_steps = len(test_dataset) // effective_batch_size # max over the whole eval, but we use only 20 batches (steps)
 
         if max_batches is None:
-            eval_iterator = tqdm(test_dataloader, desc=f"Evatesttion", disable=ddp_local_rank != 0)
+            eval_iterator = tqdm(test_dataloader, desc=f"Evaluation", disable=ddp_local_rank != 0)
         else:
             eval_iterator = tqdm(test_dataloader, desc=f"Evaluation", total=max_batches, disable=ddp_local_rank != 0)
 
