@@ -246,7 +246,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sam
 
 # training parameters
 learning_rate = 2e-4
-num_epochs = 1  # using epochs for printing purposes actually, but control by max_steps
+num_epochs = 40  # using epochs for printing purposes actually, but control by max_steps
 warmup_steps = Config.warmup_steps
 # eval_steps = 280
 
