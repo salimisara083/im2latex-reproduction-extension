@@ -187,6 +187,9 @@ class LatexDataset(Dataset):
                 truncation=True,
                 return_tensors='pt'
             ).input_ids.squeeze()
+            print("***")
+            print(latex_tokens)
+            print("***")
             if latex_tokens.ndim == 0:
                 raise ValueError("Tokenized latex has no dimensions")
         except Exception as e:
