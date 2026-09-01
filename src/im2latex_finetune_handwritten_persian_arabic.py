@@ -375,7 +375,7 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
     return train_losses
 
 # evaluation loop
-def evaluate(model, val_dataloader, device, tokenizer, bleu_metric, max_batches=None, stage="val"):
+def evaluate(model, test_dataloader, device, tokenizer, bleu_metric, max_batches=None, stage="val"):
     model.eval()
     val_losses = []
     bleus = []
@@ -383,12 +383,12 @@ def evaluate(model, val_dataloader, device, tokenizer, bleu_metric, max_batches=
 
     with torch.no_grad():
         effective_batch_size = Config.batch_size_val * ddp_world_size
-        max_steps = len(val_dataset) // effective_batch_size # max over the whole eval, but we use only 20 batches (steps)
+        max_steps = len(test_dataset) // effective_batch_size # max over the whole eval, but we use only 20 batches (steps)
 
         if max_batches is None:
-            eval_iterator = tqdm(val_dataloader, desc=f"Evaluation", disable=ddp_local_rank != 0)
+            eval_iterator = tqdm(test_dataloader, desc=f"Evatesttion", disable=ddp_local_rank != 0)
         else:
-            eval_iterator = tqdm(val_dataloader, desc=f"Evaluation", total=max_batches, disable=ddp_local_rank != 0)
+            eval_iterator = tqdm(test_dataloader, desc=f"Evaluation", total=max_batches, disable=ddp_local_rank != 0)
 
         for batch_idx, batch in enumerate(eval_iterator):
             if max_batches is not None and num_evaluated_batches >= max_batches:
@@ -427,7 +427,7 @@ def evaluate(model, val_dataloader, device, tokenizer, bleu_metric, max_batches=
     return avg_val_loss, avg_bleu
 
 # starting LoRA fine-tuning
-train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, eval_steps, val_dataloader, tokenizer, bleu_metric, local_rank=ddp_local_rank)
+train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, eval_steps, test_dataloader, tokenizer, bleu_metric, local_rank=ddp_local_rank)
 dist.barrier()
 
 # Rank 0 has the correct best checkpoint step
