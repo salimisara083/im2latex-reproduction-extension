@@ -81,7 +81,7 @@ test_df = pd.DataFrame({
 })
 
 def filter_df(df):
-    for row in df:
+    for i, row in df.iterrows():
         latex = row['LaTeX Label']
         path = row['Image Path']
         from pathlib import Path
