@@ -7,4 +7,4 @@ tqdm==4.66.4
 transformers==4.32.0
 peft==0.11.1
 nltk==3.9.1
-kagglehub[pandas-datasets]==0.4.2
+scikit-learn==1.5.2
