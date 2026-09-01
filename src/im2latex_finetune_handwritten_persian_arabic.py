@@ -71,10 +71,18 @@ for i in range(len(df['Image Path'])) :
     df['Image Path'][i] = "/kaggle/input/datasets/shgyg99/arabicmath2latex-hme-dataset" + df['Image Path'][i][1:]  
     
 train_imgs, test_imgs, train_labels, test_labels = train_test_split(df['Image Path'], df['LaTeX Label'], random_state=Config.seed, shuffle=True, train_size=0.8)
+dev_imgs, test_imgs, dev_labels, test_labels = train_test_split(df['Image Path'], df['LaTeX Label'], random_state=Config.seed, shuffle=True, train_size=0.5)
+
 train_df = pd.DataFrame({
                         'Image Path':train_imgs,
                         'LaTeX Label':train_labels
 })
+
+dev_df = pd.DataFrame({
+                        'Image Path':dev_imgs,
+                        'LaTeX Label':dev_labels
+})
+
 test_df = pd.DataFrame({
                         'Image Path':test_imgs,
                         'LaTeX Label':test_labels
@@ -106,11 +114,14 @@ def filter_df(df):
     return df
 
 train_df = filter_df(train_df)
+dev_df = filter_df(dev_df)
 test_df = filter_df(test_df)
 
 if master_process:
     print("Length of train set after splitting:", len(train_df))
+    print("Length of dev set after splitting:", len(dev_df))
     print("Length of val set after splitting:", len(test_df))
+
 
 # setting up the model
 base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex").to(device)
@@ -203,7 +214,7 @@ def data_collator(batch):
     pixel_values = torch.stack([item['pixel_values'] for item in batch])
     
     # Handle labels, ensuring it's always a list of tensors
-    labels = [item['labels'] for item in batch if item['labels'].numel() > 0]
+    labels = [item['labels'] if item['labels'].numel() > 0 else torch.tensor([0]) for item in batch]
     
     if len(labels) == 0:
         # if all labels are empty, return a dummy tensor
@@ -222,19 +233,22 @@ def data_collator(batch):
 
 # creating datasets and dataloader
 train_dataset = LatexDataset(train_df, tokenizer, feature_extractor, phase='train')
+dev_dataset = LatexDataset(dev_df, tokenizer, feature_extractor, phase='dev')
 test_dataset = LatexDataset(test_df, tokenizer, feature_extractor, phase='test')
 
 train_sampler = DistributedSampler(train_dataset)
+dev_sampler = DistributedSampler(dev_dataset)
 test_sampler = DistributedSampler(test_dataset, shuffle=False)
 
 train_dataloader = DataLoader(train_dataset, batch_size=Config.batch_size_train, sampler=train_sampler, collate_fn=data_collator, drop_last=True )
+dev_dataloader = DataLoader(dev_dataset, batch_size=Config.batch_size_val, sampler=dev_sampler, collate_fn=data_collator, drop_last=True )
 test_dataloader = DataLoader(test_dataset, batch_size=Config.batch_size_val, sampler=test_sampler, collate_fn=data_collator, drop_last=True )
 
 # training parameters
 learning_rate = 2e-4
 num_epochs = 1  # using epochs for printing purposes actually, but control by max_steps
 warmup_steps = Config.warmup_steps
-eval_steps = 280
+# eval_steps = 280
 
 # effective batch size per GPU (or per process)
 effective_batch_size = Config.batch_size_train * ddp_world_size
@@ -260,11 +274,11 @@ bleu_metric = evaluate.load(Config.bleu)
 best_checkpoint_step = None
 
 # training loop for LoRA fine-tuning
-def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, eval_steps, val_dataloader, tokenizer, bleu_metric, local_rank=0):
+def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, dev_dataloader, tokenizer, bleu_metric, local_rank=0):
     model.train()
     train_losses = [] # list to store losses for whole epoch averaging
     interval_losses = [] # list to store interval losses (updates every eval_steps)
-    best_val_loss = float('inf')
+    best_dev_loss = float('inf')
     all_metrics = [] # list to store all metrics
 
     checkpoint_dir = Config.checkpoint_dir
@@ -302,69 +316,69 @@ def train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs
             # Increment global_step
             global_step = epoch * total_steps_per_epoch + step + 1
 
-            # logging and averaging loss every eval_steps
-            if global_step % eval_steps == 0 or (epoch == num_epochs - 1 and step == total_steps_per_epoch - 1):
-                # computing the average loss for the last eval_steps
-                average_loss = np.mean(interval_losses)
-                train_losses.append(average_loss)
-                if master_process:
-                    print(" ")
-                    print("-----------------------------------------------------------")
-                    print(f"Step {global_step} - Average Training Loss: {average_loss}")
-                    print("-----------------------------------------------------------")
+            # logging and averaging loss every 2 epochs 
+        if epoch % 2 == 1 :
+            # computing the average loss for the last eval_steps
+            average_loss = np.mean(interval_losses)
+            train_losses.append(average_loss)
+            if master_process:
+                print(" ")
+                print("-----------------------------------------------------------")
+                print(f"Step {global_step} - Average Training Loss: {average_loss}")
+                print("-----------------------------------------------------------")
 
-                # resetting interval losses for the next interval
-                interval_losses = []
+            # resetting interval losses for the next interval
+            interval_losses = []
 
-                # evaluating on validation set
-                val_loss, bleu_score = evaluate(model, val_dataloader, device, tokenizer, bleu_metric)
-                if master_process: # print only for process with local rank 1
-                    print("-----------------------------------------------------------")
-                    print(f"Validation Loss after {global_step} steps: {val_loss}")
-                    print(f"Validation BLEU Score after {global_step} steps: {bleu_score}")
-                    print("-----------------------------------------------------------")
+            # evaluating on validation set
+            dev_loss, bleu_score = evaluate(model, dev_dataloader, device, tokenizer, bleu_metric)
+            if master_process: # print only for process with local rank 1
+                print("-----------------------------------------------------------")
+                print(f"Validation Loss after {global_step} steps: {dev_loss}")
+                print(f"Validation BLEU Score after {global_step} steps: {bleu_score}")
+                print("-----------------------------------------------------------")
 
-                    metrics = {
-                        "global_step": global_step,
-                        "train_loss": average_loss,
-                        "val_loss": val_loss,
-                        "val_bleu_score": bleu_score
-                    }
-                    all_metrics.append(metrics)
+                metrics = {
+                    "global_step": global_step,
+                    "train_loss": average_loss,
+                    "dev_loss": dev_loss,
+                    "dev_bleu_score": bleu_score
+                }
+                all_metrics.append(metrics)
 
-                    with open("training_metrics.json", "w") as f:
-                        json.dump(all_metrics, f)
+                with open("training_metrics.json", "w") as f:
+                    json.dump(all_metrics, f)
 
-                    # saving the model checkpoint if validation loss improved
-                    if val_loss < best_val_loss:
-                        best_val_loss = val_loss
+                # saving the model checkpoint if validation loss improved
+                if dev_loss < best_dev_loss:
+                    best_dev_loss = dev_loss
 
-                        # saving the new model checkpoint
-                        checkpoint_name = f"checkpoint_step_{global_step}"
-                        checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
-                        os.makedirs(checkpoint_path, exist_ok=True)  # creating directory if it doesn't exist
+                    # saving the new model checkpoint
+                    checkpoint_name = f"checkpoint_step_{global_step}"
+                    checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
+                    os.makedirs(checkpoint_path, exist_ok=True)  # creating directory if it doesn't exist
                         
-                        model.module.save_pretrained(checkpoint_path)
-                        tokenizer.save_pretrained(checkpoint_path)
+                    model.module.save_pretrained(checkpoint_path)
+                    tokenizer.save_pretrained(checkpoint_path)
 
-                        # updating the best checkpoint step for folder name
-                        global best_checkpoint_step
-                        best_checkpoint_step = global_step
+                    # updating the best checkpoint step for folder name
+                    global best_checkpoint_step
+                    best_checkpoint_step = global_step
 
-                        if best_checkpoint_step is not None: #it's not the first global step
-                            for filename in os.listdir(checkpoint_dir):
-                                if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}":
-                                    try:
-                                        step_number = int(
-                                                        filename.removeprefix("checkpoint_step_").removesuffix(".pt")
-                                                        )
-                                        if step_number < (best_checkpoint_step):
-                                            previous_checkpoint_path = os.path.join(checkpoint_dir, filename)
-                                            if os.path.isdir(previous_checkpoint_path):
-                                                import shutil
-                                                shutil.rmtree(previous_checkpoint_path) #remove the dir and everything inside it
-                                    except ValueError:
-                                        continue
+                    if best_checkpoint_step is not None: #it's not the first global step
+                        for filename in os.listdir(checkpoint_dir):
+                            if filename.startswith(f"checkpoint_step_") and filename != f"checkpoint_step_{best_checkpoint_step}":
+                                try:
+                                    step_number = int(
+                                                    filename.removeprefix("checkpoint_step_").removesuffix(".pt")
+                                                    )
+                                    if step_number < (best_checkpoint_step):
+                                        previous_checkpoint_path = os.path.join(checkpoint_dir, filename)
+                                        if os.path.isdir(previous_checkpoint_path):
+                                            import shutil
+                                            shutil.rmtree(previous_checkpoint_path) #remove the dir and everything inside it
+                                except ValueError:
+                                    continue
         torch.cuda.synchronize() #cpu waiting until all of the cuda operations on the current GPU has been finished
         epoch_end_time = time.time()
         epoch_duration = epoch_end_time - epoch_start_time
@@ -427,7 +441,7 @@ def evaluate(model, test_dataloader, device, tokenizer, bleu_metric, max_batches
     return avg_val_loss, avg_bleu
 
 # starting LoRA fine-tuning
-train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, eval_steps, test_dataloader, tokenizer, bleu_metric, local_rank=ddp_local_rank)
+train_losses = train_lora(model, train_dataloader, optimizer, scheduler, device, num_epochs, dev_dataloader, tokenizer, bleu_metric, local_rank=ddp_local_rank)
 dist.barrier()
 
 # Rank 0 has the correct best checkpoint step
@@ -453,7 +467,7 @@ print(f"Test BLEU Score: {test_bleu_scores}")
 if master_process: 
     metrics_test = {
             "test_losses": test_loss,
-            "test_bleu_scores": test_bleu_scores
+            "test_bleu_scores": test_bleu_scores 
         }
     with open("test_metrics.json", "w") as f:
         json.dump(metrics_test, f)
