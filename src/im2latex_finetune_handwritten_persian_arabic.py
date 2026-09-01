@@ -186,12 +186,9 @@ class LatexDataset(Dataset):
                 max_length=self.max_length,
                 truncation=True,
                 return_tensors='pt'
-            ).input_ids.squeeze()
-            print("***")
-            print(latex_tokens)
-            print("***")
-            if latex_tokens.ndim == 0:
-                raise ValueError("Tokenized latex has no dimensions")
+            ).input_ids.squeeze(0)
+            if latex_tokens.ndim != 1:
+                raise ValueError("Tokenized latex not valid!")
         except Exception as e:
             print(f"Error tokenizing latex at index {idx}: {str(e)}")
             # provide a default tensor in case of error
