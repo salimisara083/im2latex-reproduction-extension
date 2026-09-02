@@ -1,6 +1,6 @@
 # Image to LaTeX conerter for handwritten English and Persian/Arabic mathematical formulas  
 
-This repo contains reproduction of [IM2LATEX] (https://arxiv.org/abs/2408.04015) and fine-tuning it on [Persian/Arabic dataset] (https://www.kaggle.com/datasets/shgyg99/arabicmath2latex-hme-dataset) .
+This repository contains reproduction of [IM2LATEX](https://arxiv.org/abs/2408.04015) and fine-tuning it on [Persian/Arabic dataset](https://www.kaggle.com/datasets/shgyg99/arabicmath2latex-hme-dataset) .
 
 ## Reproduction
 
