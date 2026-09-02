@@ -1,11 +1,8 @@
-from huggingface_hub import HfApi, Repository, login
-from transformers import (
-    VisionEncoderDecoderModel,
-    AutoTokenizer
-)
+from huggingface_hub import HfApi
 
-api = HfApi()
-api.create_repo(repo_id="salimisara083/im2latex-handwritten-arabic-persian",
+
+api = HfApi(token="")
+api.create_repo(repo_id="salimisara083/persian_arabic_math_formula_image2latex",
                 repo_type="model",
                 exist_ok=True)
 
@@ -15,55 +12,67 @@ checkpoint_dir = f"D://projects/im2latex/checkpoints"
 api.upload_folder(
     folder_path=checkpoint_dir,
     path_in_repo='',
-    repo_id=model_name
+    repo_id='salimisara083/persian_arabic_math_formula_image2latex'
 )
 
 
 # Copy README to the repository
 readme = """
-# Your Model Name
+## im2latex reproduction and extension
 
-This model is a VisionEncoderDecoderModel fine-tuned on a dataset for generating LaTeX formulas from images.
+[im2latex](https://huggingface.co/DGurgurov/im2latex) is a ViLM model with swin-gpt2 architecture which generates latex form of the given math formula.
+It's fine-tuned in 2 phases :
+- **base model:**  fine-tuned on **printed** math formulas containing **English** numerals .
+- **fine-tuning on handwritten formulas:** fine-tuning the **base model** on **handwritten** formulas containing **English** numerals.
+This step is done using LoRA.
 
-## Model Details
+This repo consists of two models :
 
-- **Encoder**: Swin Transformer
-- **Decoder**: GPT-2
-- **Framework**: PyTorch
-- **DDP (Distributed Data Parallel)**: Used for training
-            
-## Training Data
-            
-The data is taken from [OleehyO/latex-formulas](https://huggingface.co/datasets/OleehyO/latex-formulas). The data was divided into 80:10:10 for train, val and test. The splits were made as follows:
-
-```python
-dataset = load_dataset(OleehyO/latex-formulas, cleaned_formulas)
-train_val_split = dataset["train"].train_test_split(test_size=0.2, seed=42)
-train_ds = train_val_split["train"]
-val_test_split = train_val_split["test"].train_test_split(test_size=0.5, seed=42)
-val_ds = val_test_split["train"]
-test_ds = val_test_split["test"]
-```                     
+-**Stage1:** the resulting model of reproduction of the second phase (**fine-tuning on handwritten formulas**)
+-**Stage2:** fine-tuning the resulting model of stage1 on the dataset consisting of **handwritten** formulas containing **Persian/Arabic** numerals; [dataset](https://www.kaggle.com/datasets/shgyg99/arabicmath2latex-hme-dataset). 
+                   
 
 ## Evaluation Metrics
 
-The model was evaluated on a test set with the following results:
-- **Test Loss**: 0.10473818009443304
-- **Test BLEU Score**: 0.6661951245257148
+**stage1**
+- **Test Loss**: 0.008761799894273281
+- **Test BLEU Score**: 0.6321135759353638
+
+**stage2**
+- **Test Loss**: 0.3324839249253273
+- **Test BLEU Score**: 0.6329445741897406
 
 ## Usage
 
+This model uses an older version of transformers(4.32.0 is compatable) which can be run on python3.10.0
 You can use the model directly with the `transformers` library:
 
 ```python
 from transformers import VisionEncoderDecoderModel, AutoTokenizer, AutoFeatureExtractor
 import torch
 from PIL import Image
+from peft import PeftModel
+
+from transformers import VisionEncoderDecoderModel
+from peft import PeftModel
+
+base_model = VisionEncoderDecoderModel.from_pretrained("BASE_MODEL")
+
+model = PeftModel.from_pretrained(
+    base_model,
+    "YOUR_USERNAME/YOUR_REPO",
+    subfolder="stage2"
+)
 
 # Load model, tokenizer, and feature extractor
-model = VisionEncoderDecoderModel.from_pretrained("your-username/your-model-name")
-tokenizer = AutoTokenizer.from_pretrained("your-username/your-model-name")
-feature_extractor = AutoFeatureExtractor.from_pretrained("your-username/your-model-name")
+base_model = VisionEncoderDecoderModel.from_pretrained("DGurgurov/im2latex")
+model = PeftModel.from_pretrained(
+    base_model,
+    "salimisara083/persian_arabic_math_formula_image2latex",
+    subfolder="stage2" #or stage1
+)
+tokenizer = AutoTokenizer.from_pretrained("DGurgurov/im2latex")
+feature_extractor = AutoFeatureExtractor.from_pretrained("microsoft/swin-base-patch4-window7-224-in22k") # using the original feature extractor for now
 
 # Prepare an image
 image = Image.open("path/to/your/image.png")
@@ -77,7 +86,7 @@ print("Generated LaTeX formula:", generated_texts[0])
 ```
 
 ## Training Script
-The training script for this model can be found in the following repository: [GitHub](https://github.com/d-gurgurov/im2latex)
+The training script for this model can be found in the following repository: [GitHub](https://github.com/salimisara083/im2latex-reproduction-extension)
 
 License
 [MIT]
@@ -90,5 +99,5 @@ with open(f'README.md', 'w') as f:
 api.upload_file(
 path_or_fileobj=f'README.md',
 path_in_repo='README.md',
-repo_id=model_name
+repo_id='salimisara083/persian_arabic_math_formula_image2latex'
 )
