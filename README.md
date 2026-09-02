@@ -20,7 +20,7 @@ The checkpoint handling code block which was marked as 'TODO' becoause of a bug 
 
 Some enhancements and assertions are implemented as well .
 
-The library versions used and named in requirenments.txt are compatable with python3.10 so i created a venv on kaggle notebook using https://www.kaggle.com/code/dwchen/using-python3-10-on-kaggle .
+The library versions used and mensioned in requirements.txt are compatable with python3.10 so i created a venv on kaggle notebook using https://www.kaggle.com/code/dwchen/using-python3-10-on-kaggle .
 
 ### Test Evaluation Metrics
 
@@ -38,7 +38,26 @@ my results :
 
   ![](https://github.com/salimisara083/im2latex-reproduction-extension/blob/main/assets/stage1.png)
 
-## Extension : Fine-Tuning on dataset containing formalas with Persian/Arabic numerals
+## Extension : Fine-Tuning on formulas dataset containing Persian/Arabic numerals
+
+Data is taken from [dataset](https://huggingface.co/datasets/linxy/LaTeX_OCR)
+
+The resulting model of phase1 is fine-tuned using LoRA on this dataset.
+
+Checkpoints of either phases are available at [HuggingFace](https://huggingface.co/salimisara083/persian_arabic_math_formula_image2latex).
+
+### Test Evaluation Metrics
+
+The model was evaluated on a test set with the following results:
+
+- Test Loss: 0.3324
+- Test BLEU Score: 0.6329
+
+### Training Curve
+
+![](https://github.com/salimisara083/im2latex-reproduction-extension/blob/main/assets/stage2.png)
+
+
 
 
 
