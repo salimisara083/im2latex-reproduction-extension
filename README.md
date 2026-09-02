@@ -27,16 +27,12 @@ The library versions used and named in requirenments.txt are compatable with pyt
 The model was evaluated on a test set with the following results:
 
 original paper results :
-
-Test Loss: 0.02
-
-Test BLEU Score: 0.67
+-Test Loss: 0.02
+-Test BLEU Score: 0.67
 
 my results :
-
-Test Loss: 0.0087
-
-Test BLEU Score: 0.6321
+-Test Loss: 0.0087
+-Test BLEU Score: 0.6321
 
 ## Extension : Fine-Tuning on dataset containing formalas with Persian/Arabic numerals
 
