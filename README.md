@@ -5,6 +5,7 @@ This repository contains reproduction of [IM2LATEX](https://arxiv.org/abs/2408.0
 ## Reproduction
 
 The model is a ViLM (Swin + GPT2) 
+
 It's fine-tuned in 2 phases in original paper : 
 - Phase 1 : full fine-tuning on printed [printed formulas](https://huggingface.co/datasets/OleehyO/latex-formulas) which results the **Base Model** .
 - Phase 2 : fine-tuning the Base Model on [handwritten formulas (containing English numerals)](https://huggingface.co/datasets/linxy/LaTeX_OCR) using parameter efficient fine-tuning method LoRA.
@@ -22,14 +23,19 @@ Some enhancements and assertions are implemented as well .
 The library versions used and named in requirenments.txt are compatable with python3.10 so i created a venv on kaggle notebook using https://www.kaggle.com/code/dwchen/using-python3-10-on-kaggle .
 
 ### Test Evaluation Metrics
+
 The model was evaluated on a test set with the following results:
 
 original paper results :
+
 Test Loss: 0.02
+
 Test BLEU Score: 0.67
 
 my results :
+
 Test Loss: 0.0087
+
 Test BLEU Score: 0.6321
 
 ## Extension : Fine-Tuning on dataset containing formalas with Persian/Arabic numerals
