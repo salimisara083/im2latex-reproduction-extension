@@ -36,7 +36,7 @@ my results :
 
   ### Training Curve
 
-  [training curve](https://github.com/salimisara083/im2latex-reproduction-extension/blob/main/assets/stage1.png)
+  ![training curve](https://github.com/salimisara083/im2latex-reproduction-extension/blob/main/assets/stage1.png)
 
 ## Extension : Fine-Tuning on dataset containing formalas with Persian/Arabic numerals
 
