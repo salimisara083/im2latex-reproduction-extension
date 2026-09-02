@@ -6,10 +6,10 @@ This repo contains reproduction of [IM2LATEX] (https://arxiv.org/abs/2408.04015)
 
 The model is a ViLM (Swin + GPT2) 
 It's fine-tuned in 2 phases in original paper : 
-- Phase 1 : full fine-tuning on printed [printed formulas] (https://huggingface.co/datasets/OleehyO/latex-formulas) which results the **Base Model** .
-- Phase 2 : fine-tuning the Base Model on [handwritten formulas (containing English numerals)] (https://huggingface.co/datasets/linxy/LaTeX_OCR) using parameter efficient fine-tuning method LoRA.
+- Phase 1 : full fine-tuning on printed [printed formulas](https://huggingface.co/datasets/OleehyO/latex-formulas) which results the **Base Model** .
+- Phase 2 : fine-tuning the Base Model on [handwritten formulas (containing English numerals)](https://huggingface.co/datasets/linxy/LaTeX_OCR) using parameter efficient fine-tuning method LoRA.
 
-The Base Model is shared on [HuggingFace] (https://huggingface.co/DGurgurov/im2latex) and i decided to reproduce the second phase .
+The Base Model is shared on [HuggingFace](https://huggingface.co/DGurgurov/im2latex) and i decided to reproduce the second phase .
 The reproduction is done on Kaggle Notebook accelerating two T4 GPUs and using pytorch's Distributed Data Parallel .
 The batch size is reduced to 8 .
 The checkpoint handling code block which was marked as 'TODO' becoause of a bug is fixed .
