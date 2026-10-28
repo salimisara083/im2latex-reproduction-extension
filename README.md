@@ -40,7 +40,7 @@ my results :
 
 ## Extension : Fine-Tuning on formulas dataset containing Persian/Arabic numerals
 
-Data is taken from [dataset]([https://huggingface.co/datasets/linxy/LaTeX_OCR](https://www.kaggle.com/datasets/shgyg99/arabicmath2latex-hme-dataset))
+Data is taken from [dataset](https://www.kaggle.com/datasets/shgyg99/arabicmath2latex-hme-dataset)
 
 The resulting model of phase1 is fine-tuned using LoRA on this dataset.
 
